@@ -398,18 +398,19 @@ class NetkeibaRaceScraper:
     #  Pedigree
     # ----------------------------------------------------------------
     def fetch_pedigree(self, horse_id: str) -> list[str]:
-        url = f"{self.DB_URL}/horse/{horse_id}/"
+        url = f"{self.DB_URL}/horse/ped/{horse_id}/"
         soup = self._fetch(url, encoding="euc-jp")
         if not soup:
             return []
-        found = []
-        for sel in [".pedigree_table a", ".blood_table a", "a[href*='/horse/ped/']"]:
-            for a in soup.select(sel):
-                name = a.get_text(strip=True)
-                if name and len(name) <= 20 and name not in found:
-                    found.append(name)
-            if found:
-                break
+        table = soup.select_one("table.blood_table")
+        if not table:
+            return []
+        skip = {"血統", "産駒", "TOP", "戦績"}
+        found: list[str] = []
+        for a in table.select("a[href*='/horse/']"):
+            name = a.get_text(strip=True)
+            if name and name not in skip and len(name) <= 20 and name not in found:
+                found.append(name)
         return found[:7]
 
     # ----------------------------------------------------------------
