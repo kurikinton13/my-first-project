@@ -1,0 +1,103 @@
+# 使い方ガイド
+
+## 1. PCでの実行
+
+### インストール
+```
+py -m pip install -r requirements.txt
+```
+
+### コマンドライン
+```
+search "日本ダービー"
+search "有馬記念" -o ./data --excel
+search --interactive
+```
+
+または
+```
+py -m jra_scraper.cli.main "日本ダービー"
+py -m jra_scraper.cli.main "有馬記念" -o ./data --excel
+py -m jra_scraper.cli.main --interactive
+```
+
+### Web UI（スマホからもアクセス可）
+```
+start_web
+```
+
+または
+```
+py -m web_app
+```
+
+→ http://localhost:5000 にアクセス
+スマホからは同じWi-Fiで `http://<PCのIP>:5000` にアクセス
+
+---
+
+## 2. Androidスマホ単体で動かす（Termux）
+
+### Termuxのインストール
+1. F-Droid をインストール（https://f-droid.org）
+2. F-Droid で Termux を検索してインストール（Google Play版は非推奨）
+
+### 準備
+```bash
+pkg update && pkg upgrade -y
+pkg install python git -y
+```
+
+### プロジェクトを入手
+```bash
+cd ~
+git clone https://github.com/＜あなたのリポジトリ＞/keiba
+cd keiba
+```
+
+### 起動
+```bash
+pip install -r requirements.txt && python web_app.py --host 0.0.0.0 --port 8080
+```
+
+スマホのブラウザで http://localhost:8080 にアクセス。
+
+※ netkeibaからデータを取るのでモバイル通信が必要です。
+
+---
+
+## 3. インターネット公開（Renderに無料デプロイ）
+
+スマホ1台でURLを開くだけで使えるようになります。
+
+### 手順
+1. GitHub にこのプロジェクトをアップロード
+2. https://render.com にアクセス → "New +" → "Web Service"
+3. GitHubリポジトリを連携
+4. 以下の設定で作成:
+   - Name: `keiba-scraper`（任意）
+   - Region: 日本に近いSingapore推奨
+   - Branch: `main`
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 60`
+   - FreeプランでOK
+5. 作成完了後、`https://keiba-scraper.onrender.com` のようなURLが発行される
+
+### 注意
+- 無料プランは15分アクセスがないとスリープします（次回アクセス時に10秒程度待つ）
+- スリープを避けるには有料プラン（月$7〜）が必要
+
+---
+
+## 4. 検索できるレース名の例
+
+| 入力例 | 正式レース名 |
+|--------|------------|
+| 日本ダービー / 東京優駿 | 東京優駿 |
+| 有馬記念 | 有馬記念 |
+| 天皇賞（秋）/ 天皇賞(秋) | 天皇賞(秋) |
+| マイルCS / マイルチャンピオンシップ | マイルCS |
+| 朝日杯FS / 朝日杯フューチュリティS | 朝日杯フューチュリティS |
+| AJCC / アメリカJCC | アメリカジョッキークラブカップ |
+
+全141レースのJRA重賞に対応。
