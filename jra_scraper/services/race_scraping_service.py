@@ -35,7 +35,7 @@ class RaceScrapingService:
     def _fetch_all(self, race_id: str) -> dict[str, pd.DataFrame]:
         race_info = self.scraper.fetch_race_info(race_id)
         entries = self.scraper.fetch_entries(race_id)
-        odds_data = self.scraper.fetch_odds_from_result(race_id)
+        odds_data = self.scraper.fetch_odds(race_id)
         horse_weights = self.scraper.fetch_horse_weight(race_id)
 
         recent_results, notes_rows = self._fetch_horse_data_parallel(entries)

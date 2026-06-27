@@ -313,9 +313,17 @@ class NetkeibaRaceScraper:
             return None
 
     # ----------------------------------------------------------------
-    #  Odds from result page
+    #  Odds from result page or pre-race odds page
     # ----------------------------------------------------------------
-    def fetch_odds_from_result(self, race_id: str) -> dict:
+    def fetch_odds(self, race_id: str) -> dict:
+        # 1) Try result page (post-race, has payout info)
+        odds = self._fetch_odds_from_result(race_id)
+        if odds and odds.get("win_odds"):
+            return odds
+        # 2) Fall back to pre-race odds page
+        return self._fetch_odds_from_odds_page(race_id)
+
+    def _fetch_odds_from_result(self, race_id: str) -> dict:
         url = f"{self.RESULT_URL}?race_id={race_id}"
         soup = self._fetch(url)
         if not soup:
@@ -346,6 +354,34 @@ class NetkeibaRaceScraper:
             odds["payout"] = []
             for t in payout_tables:
                 odds["payout"].append(t.get_text(" ", strip=True))
+        return odds
+
+    def _fetch_odds_from_odds_page(self, race_id: str) -> dict:
+        url = "https://race.netkeiba.com/race/odds.html?race_id={}&type=b1"
+        url = url.format(race_id)
+        soup = self._fetch(url)
+        if not soup:
+            return {}
+        odds = {
+            "race_id": race_id,
+            "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "win_odds": [],
+        }
+        for tr in soup.select("tr.HorseList"):
+            tds = tr.select("td")
+            if len(tds) < 5:
+                continue
+            horse_num = self._clean_int(tds[1].get_text(strip=True))
+            horse_name = tds[2].get_text(strip=True)
+            odds_val = self._clean_float(tds[3].get_text(strip=True))
+            ninki = self._clean_int(tds[4].get_text(strip=True))
+            if horse_num:
+                odds["win_odds"].append({
+                    "horse_number": horse_num,
+                    "horse_name": horse_name,
+                    "odds": odds_val,
+                    "popularity": ninki,
+                })
         return odds
 
     # ----------------------------------------------------------------
