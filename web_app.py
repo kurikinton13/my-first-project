@@ -9,7 +9,7 @@ import re
 import sys
 import time
 from collections import OrderedDict
-from io import StringIO, BytesIO
+from io import BytesIO
 import zipfile
 
 # Ensure project root is importable (needed for Render / gunicorn)
@@ -251,10 +251,10 @@ def download(table: str, cache_key: str):
     if ri is not None and not ri.empty:
         race_name = ri.iloc[0].get("レース名", "")
     safe = re.sub(r'[\\/:*?"<>|]+', "_", race_name) or "race"
-    buf = StringIO()
+    buf = BytesIO()
     df.to_csv(buf, index=False, encoding="utf-8-sig")
     buf.seek(0)
-    return send_file(StringIO(buf.getvalue()), mimetype="text/csv",
+    return send_file(buf, mimetype="text/csv",
                      as_attachment=True, download_name=f"{safe}_{table}.csv")
 
 
@@ -272,9 +272,10 @@ def download_all(cache_key: str):
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for key, df in dfs.items():
             if isinstance(df, pd.DataFrame) and not df.empty:
-                csv_buf = StringIO()
+                csv_buf = BytesIO()
                 df.to_csv(csv_buf, index=False, encoding="utf-8-sig")
-                zf.writestr(f"{key}.csv", csv_buf.getvalue().encode("utf-8-sig"))
+                csv_buf.seek(0)
+                zf.writestr(f"{key}.csv", csv_buf.getvalue())
     buf.seek(0)
     return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{safe}.zip")
 
