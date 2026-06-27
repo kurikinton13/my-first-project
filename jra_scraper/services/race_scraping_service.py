@@ -359,6 +359,8 @@ class RaceScrapingService:
             cols = [c for c in ["馬番", "馬名", "単勝オッズ", "人気"] if c in odds_df.columns]
             if cols:
                 print(odds_df[cols].to_string(index=False))
+        else:
+            print("\nオッズ: 未発表（netkeibaにオッズ未掲載のため）")
 
         notes_df = self._data.get("notes")
         if notes_df is not None and not notes_df.empty:

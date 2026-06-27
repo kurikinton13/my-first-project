@@ -357,31 +357,78 @@ class NetkeibaRaceScraper:
         return odds
 
     def _fetch_odds_from_odds_page(self, race_id: str) -> dict:
-        url = "https://race.netkeiba.com/race/odds.html?race_id={}&type=b1"
+        # 1) Fetch horse name mapping from the odds page HTML
+        horse_names: dict[str, str] = {}
+        html_soup = self._fetch(f"https://race.netkeiba.com/odds/index.html?race_id={race_id}")
+        if html_soup:
+            import json
+            for script in html_soup.select("script"):
+                text = script.string or ""
+                m = re.search(r"var horse_list\s*=\s*JSON\.parse\('(.*?)'\)", text)
+                if m:
+                    try:
+                        hl = json.loads(m.group(1))
+                        for v in hl.values():
+                            if "Umaban" in v and "Bamei" in v:
+                                horse_names[str(v["Umaban"])] = v["Bamei"]
+                    except Exception:
+                        pass
+                    break
+
+        # 2) Fetch odds via JSONP API
+        url = "https://race.netkeiba.com/api/api_get_jra_odds.html?pid=api_get_jra_odds&race_id={}&type=all&action=init&sort=ninki&compress=0&callback=jsonpCB"
         url = url.format(race_id)
         soup = self._fetch(url)
         if not soup:
             return {}
+        text = soup.get_text().strip()
+        if text.startswith("jsonpCB(") and text.endswith(")"):
+            text = text[len("jsonpCB("):-1]
+        if text.startswith("(") and text.endswith(")"):
+            text = text[1:-1]
+        import json
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return {}
+        raw = data.get("data")
+        if not raw:
+            return {}
+        if isinstance(raw, dict):
+            odds_data = raw
+        else:
+            import base64, zlib, binascii
+            try:
+                decoded = base64.b64decode(raw)
+                raw = zlib.decompress(decoded).decode("utf-8")
+            except (binascii.Error, zlib.error, TypeError):
+                pass
+            try:
+                odds_data = json.loads(raw) if isinstance(raw, str) else raw
+            except json.JSONDecodeError:
+                return {}
         odds = {
             "race_id": race_id,
             "fetched_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "win_odds": [],
         }
-        for tr in soup.select("tr.HorseList"):
-            tds = tr.select("td")
-            if len(tds) < 5:
+        for btype, horses in odds_data.get("odds", {}).items():
+            if btype != "1":
                 continue
-            horse_num = self._clean_int(tds[1].get_text(strip=True))
-            horse_name = tds[2].get_text(strip=True)
-            odds_val = self._clean_float(tds[3].get_text(strip=True))
-            ninki = self._clean_int(tds[4].get_text(strip=True))
-            if horse_num:
-                odds["win_odds"].append({
-                    "horse_number": horse_num,
-                    "horse_name": horse_name,
-                    "odds": odds_val,
-                    "popularity": ninki,
-                })
+            for key, row in horses.items():
+                if not row or len(row) < 4:
+                    continue
+                horse_num = self._clean_int(row[3])
+                odds_val = self._clean_float(row[0])
+                ninki = self._clean_int(row[2])
+                hname = horse_names.get(str(self._clean_int(row[3])), "")
+                if horse_num and odds_val:
+                    odds["win_odds"].append({
+                        "horse_number": horse_num,
+                        "horse_name": hname,
+                        "odds": odds_val,
+                        "popularity": ninki,
+                    })
         return odds
 
     # ----------------------------------------------------------------
