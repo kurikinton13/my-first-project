@@ -6,10 +6,16 @@
 import logging
 import os
 import re
+import sys
 import time
 from collections import OrderedDict
 from io import StringIO, BytesIO
 import zipfile
+
+# Ensure project root is importable (needed for Render / gunicorn)
+_root = os.path.dirname(os.path.abspath(__file__))
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
 import pandas as pd
 from flask import Flask, render_template_string, request, send_file
