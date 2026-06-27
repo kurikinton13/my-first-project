@@ -11,7 +11,9 @@ import time
 import traceback
 import threading
 import urllib.parse
+import zipfile
 from collections import OrderedDict
+from io import BytesIO
 import json
 
 _cache_lock = threading.Lock()
@@ -392,7 +394,8 @@ def download(table: str, cache_key: str):
         race_name = ""
         if ri is not None and not ri.empty:
             race_name = ri.iloc[0].get("レース名", "")
-        safe = re.sub(r'[^a-zA-Z0-9_]+', "_", race_name)[:30] or "race"
+        safe = (re.sub(r'[^a-zA-Z0-9_]+', "_", race_name)[:30].strip("_")
+                or f"race_{len(race_name)}")
         fname = urllib.parse.quote(f"{safe}_{table}.csv")
         csv_text = df.to_csv(index=False)
         r = Response(
@@ -414,17 +417,19 @@ def download_all(cache_key: str):
     race_name = ""
     if ri is not None and not ri.empty:
         race_name = ri.iloc[0].get("レース名", "")
-    safe = re.sub(r'[^a-zA-Z0-9_]+', "_", race_name)[:30] or "race"
-    fname = urllib.parse.quote(f"{safe}_all.txt")
-    parts = []
-    for key, df in dfs.items():
-        if isinstance(df, pd.DataFrame) and not df.empty:
-            parts.append(f"--- {key}.csv ---")
-            parts.append(df.to_csv(index=False))
-    text = "\n".join(parts)
+    safe = (re.sub(r'[^a-zA-Z0-9_]+', "_", race_name)[:30].strip("_")
+            or f"race_{len(race_name)}")
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for key, df in dfs.items():
+            if isinstance(df, pd.DataFrame) and not df.empty:
+                csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+                zf.writestr(f"{key}.csv", csv_bytes)
+    zip_bytes = buf.getvalue()
+    fname = urllib.parse.quote(f"{safe}.zip")
     return Response(
-        text,
-        mimetype="text/plain; charset=utf-8",
+        zip_bytes,
+        mimetype="application/zip",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fname}"},
     )
 
