@@ -18,7 +18,7 @@ if _root not in sys.path:
     sys.path.insert(0, _root)
 
 import pandas as pd
-from flask import Flask, render_template_string, request, send_file
+from flask import Flask, render_template_string, request, Response
 
 from jra_scraper.services.race_scraping_service import RaceScrapingService
 
@@ -253,9 +253,12 @@ def download(table: str, cache_key: str):
     safe = re.sub(r'[\\/:*?"<>|]+', "_", race_name) or "race"
     buf = BytesIO()
     df.to_csv(buf, index=False, encoding="utf-8-sig")
-    buf.seek(0)
-    return send_file(buf, mimetype="text/csv",
-                     as_attachment=True, download_name=f"{safe}_{table}.csv")
+    csv_bytes = buf.getvalue()
+    return Response(
+        csv_bytes,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{safe}_{table}.csv"'},
+    )
 
 
 @app.route("/dl_all/<cache_key>")
@@ -274,10 +277,13 @@ def download_all(cache_key: str):
             if isinstance(df, pd.DataFrame) and not df.empty:
                 csv_buf = BytesIO()
                 df.to_csv(csv_buf, index=False, encoding="utf-8-sig")
-                csv_buf.seek(0)
                 zf.writestr(f"{key}.csv", csv_buf.getvalue())
-    buf.seek(0)
-    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{safe}.zip")
+    zip_bytes = buf.getvalue()
+    return Response(
+        zip_bytes,
+        mimetype="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe}.zip"'},
+    )
 
 
 @app.route("/health")
